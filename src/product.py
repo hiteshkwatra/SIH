@@ -4,7 +4,7 @@ import sys
 import time
 import playsound
 from threading import Thread
-import pyximport; pyximport.install()
+import pyximport; 
 import ddestimator
 import pandas as pd
 import tkinter as tk
@@ -13,7 +13,8 @@ import requests
 from tkinter import messagebox
 
 
-
+st=int(round(time.time()))
+er=0
 aft=0
 talking_theshold=0
 talking_frames_threshold=10
@@ -81,6 +82,7 @@ class demo1:
 		self.has_calibrated = False
 
 	def run(self):
+		global er
 		self.cap=cv2.VideoCapture(0)
 		#self.cap = cv2.VideoCapture(r"C:\Users\hites\Downloads\ezgif.com-rotate.mp4")
 		if not self.cap.isOpened():
@@ -93,11 +95,13 @@ class demo1:
 
 			if ret:
 				frame = imutils.resize(frame, width=demo1.FRAME_WIDTH)
-				frame = self.process_frame(frame)
+				frame = self.process_frame(frame,er/5)
+				print('ear', er/5)
 				cv2.imshow(demo1.WINDOW_TITLE, frame)
 				cv2.moveWindow(demo1.WINDOW_TITLE, 0, 0)
 
-	def process_frame(self, frame=None):
+	def process_frame(self, frame=None,eyethresh=0):
+		global st, er
 
 		#Detect faces in frame
 		faces_loc = self.ddestimator.detect_faces(frame, None, True)
@@ -125,6 +129,12 @@ class demo1:
 					self.ddestimator.calibrate_camera_angles(meds)
 			_, _, gaze_D = self.ddestimator.est_gaze_dir(points)
 			ear_B, ear_R, ear_L = self.ddestimator.est_eye_openness(points)
+
+			if abs(st-int(round(time.time()))) <5:
+				er+=ear_B
+				return frame
+
+
 			mar = self.ddestimator.est_mouth_openess(points)
 
 			#All timescale estimations based on points locations
@@ -133,13 +143,13 @@ class demo1:
 				gaze_distraction, _, _ = self.ddestimator.est_gaze_dir_over_time()
 			else:
 				gaze_distraction = False
-			eye_drowsiness, _, _, eye_closedness = self.ddestimator.get_eye_closedness_over_time()
+			eye_drowsiness, _, _, eye_closedness = self.ddestimator.get_eye_closedness_over_time(ear_threshold=eyethresh)
 			did_yawn, _, _, _ = self.ddestimator.get_mouth_openess_over_time()
 #########################################
 ##########################################
 			global alarm_frames_threshold, aft,last_alert,talking_frames_threshold, talking_theshold
 
-			if mar>0.17 and mar <0.59:
+			if mar>0.17 and mar <eyethresh:
 				talking_theshold+=1
 			else:
 				talking_theshold=0
